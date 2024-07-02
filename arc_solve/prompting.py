@@ -1,3 +1,27 @@
+from arc_solve.reasoning_and_labels import (
+    reasoning_labeled_items_alt_color,
+    reasoning_labeled_items_full_spreadsheet_alt_color,
+    reasoning_labeled_change_prompt_alt_color_add_swap,
+)
+from arc_solve.load_data import out_data_by_name_d
+from arc_solve.run_programs import (
+    KeyNameS,
+    RunOutput,
+    RunOutputHashable,
+    StdoutStderr,
+    evaluate_funcs_with_timeout_cache,
+)
+from arc_solve.render import (
+    RenderArgs,
+    grid_to_base64_png_oai_content,
+    color_scheme_name,
+    alt_color_scheme_name,
+    alt_color_scheme_consts_name,
+    color_scheme_consts_name,
+)
+from rrutils.llm_api.llm import ModelAPI
+from arc_solve.edit_distance import get_rank_geo_mean_score
+from arc_solve.permutations import all_permutation_indices
 from collections import Counter, defaultdict
 import json
 import math
@@ -22,31 +46,6 @@ from rrutils.llm_api.base_llm import ContextLengthExceeded, LLMResponse
 
 nest_asyncio.apply()
 
-
-from arc_solve.permutations import all_permutation_indices
-from arc_solve.edit_distance import get_rank_geo_mean_score
-from rrutils.llm_api.llm import ModelAPI
-from arc_solve.render import (
-    RenderArgs,
-    grid_to_base64_png_oai_content,
-    color_scheme_name,
-    alt_color_scheme_name,
-    alt_color_scheme_consts_name,
-    color_scheme_consts_name,
-)
-from arc_solve.run_programs import (
-    KeyNameS,
-    RunOutput,
-    RunOutputHashable,
-    StdoutStderr,
-    evaluate_funcs_with_timeout_cache,
-)
-from arc_solve.load_data import out_data_by_name_d
-from arc_solve.reasoning_and_labels import (
-    reasoning_labeled_items_alt_color,
-    reasoning_labeled_items_full_spreadsheet_alt_color,
-    reasoning_labeled_change_prompt_alt_color_add_swap,
-)
 
 if "ANTHROPIC_API_KEY" not in os.environ:
     key_path = os.path.expanduser("~/.anthropic_api_key")
@@ -422,7 +421,8 @@ def get_spreadsheet_notation_support_runs(rows_cols: list[tuple[int, int]]):
             running_str += f" {start} ... {end}"
             idx += count_in_a_row
         else:
-            running_str += " " + get_spreadsheet_notation_str(r, c, quote=False)
+            running_str += " " + \
+                get_spreadsheet_notation_str(r, c, quote=False)
             idx += 1
 
     return running_str
@@ -641,9 +641,11 @@ def spreadsheet_ascii_grid_by_color_contiguous_absolute_small_shapes(
             assert n_rows <= 30
             assert n_rows <= 30
 
-            cols_header_line = separator.join([" "] + spreadsheet_col_labels[:n_cols])
+            cols_header_line = separator.join(
+                [" "] + spreadsheet_col_labels[:n_cols])
 
-            grid_labels = np.full((n_rows, n_cols), fill_value="O", dtype=object)
+            grid_labels = np.full(
+                (n_rows, n_cols), fill_value="O", dtype=object)
 
             for i, j in absolute_shifted_shape:
                 grid_labels[i, j] = "X"
@@ -746,7 +748,8 @@ def display_single_grid_alt(
             "text": shape_text
             + ("### Image representation\n\n" if use_header_text else ""),
         },
-        grid_to_base64_png_oai_content(grid, render_args=display_args.render_args),
+        grid_to_base64_png_oai_content(
+            grid, render_args=display_args.render_args),
         {
             "type": "text",
             "text": ascii_text,
@@ -1050,7 +1053,8 @@ You'll need to carefully reason to determine the issue and to determine how to f
         wrong_results_to_show = [
             wrong_results_to_show[i]
             for i in these_indices[
-                shuffle_example_order_with_permutation_index % len(these_indices)
+                shuffle_example_order_with_permutation_index % len(
+                    these_indices)
             ]
         ]
 
@@ -1106,14 +1110,16 @@ def get_rule_input_alt(
     shuffle_example_order_with_permutation_index: Optional[int] = None,
     use_multi_part_transformation_rule_hint: bool = False,
 ):
-    exs = list(out_data_by_name_d[name]["train"]).copy()  # yes, copy is redundant
+    exs = list(out_data_by_name_d[name]["train"]
+               ).copy()  # yes, copy is redundant
     if shuffle_example_order_with_permutation_index is not None:
         assert len(exs) > 1
         these_indices_ex = all_permutation_indices[len(exs)]
         exs = [
             exs[i]
             for i in these_indices_ex[
-                shuffle_example_order_with_permutation_index % len(these_indices_ex)
+                shuffle_example_order_with_permutation_index % len(
+                    these_indices_ex)
             ]
         ]
 
@@ -1150,7 +1156,8 @@ def get_rule_input_alt(
                     "type": "text",
                     "text": f"# Additional input{test_idx_str}\n\n",
                 },
-                *display_single_grid_alt(t["input"], display_args=display_args),
+                *display_single_grid_alt(t["input"],
+                                         display_args=display_args),
             ]
         )
 
@@ -1558,6 +1565,9 @@ def process_prompt_args_for_name(name: str, prompt_args: PromptArgs):
     )
 
 
+SHOW_IMAGES = True
+
+
 async def run_on_input_alt(
     name: str,
     t: float = 0.0,
@@ -1572,10 +1582,12 @@ async def run_on_input_alt(
     fail_at_prompt_len: Optional[int] = None,
     fail_if_image_too_big_thresh: Optional[int] = None,
     dry_run: bool = False,
+    dimensions: dict = {},
 ):
     if n == 0:
         if dry_run:
-            print(f"Return because n=0, {prompt_args.name=} {is_eq_size_item(name)=}")
+            print(
+                f"Return because n=0, {prompt_args.name=} {is_eq_size_item(name)=}")
         return []
 
     prompt_args_here = process_prompt_args_for_name(name, prompt_args)
@@ -1608,7 +1620,7 @@ async def run_on_input_alt(
 
     file = io.StringIO()
     with contextlib.redirect_stdout(file) as f:
-        print_prompt(this_prompt, show_images=False)
+        print_prompt(this_prompt, show_images=SHOW_IMAGES)
 
     n_toks = len(tokenizer.encode(file.getvalue()))  # ignores images for now
 
@@ -1626,6 +1638,19 @@ async def run_on_input_alt(
     if orig_max_n_per_round != max_n_per_round:
         print(
             f"Reducing {orig_max_n_per_round=} to {max_n_per_round=} ({n_toks=}, {name=}, {prompt_args.name=})"
+        )
+
+    if dimensions.get(name, {}).get('rows') is not None:
+        columns = dimensions.get(name, {}).get('columns')
+        rows = dimensions.get(name, {}).get('rows')
+
+        dimensions_message = f"Expected grid size of final test solution (NOT TRAINING EXAMPLES, FOR THOSE YOU HAVE SOLUTIONS WITH GRID SIZE): {rows} rows x {columns} columns"
+
+        this_prompt.append(
+            {
+                "role": "user",
+                "content": dimensions_message,
+            }
         )
 
     if dry_run:
@@ -1662,6 +1687,7 @@ async def run_on_input_with_name_alt(
     fail_at_prompt_len: Optional[int] = None,
     fail_if_image_too_big_thresh: Optional[int] = None,
     dry_run: bool = False,
+    dimensions: dict = {},
 ):
     out = await run_on_input_alt(
         name,
@@ -1673,6 +1699,7 @@ async def run_on_input_with_name_alt(
         fail_at_prompt_len=fail_at_prompt_len,
         fail_if_image_too_big_thresh=fail_if_image_too_big_thresh,
         dry_run=dry_run,
+        dimensions=dimensions,
     )
 
     return name, prompt_args, t, None if out is None else [x.completion for x in out]
@@ -1708,7 +1735,8 @@ def gpt4_o_image_test_few_shot(
     out_prompt = []
 
     for ex in example_grids:
-        out_prompt.extend(gpt4_o_image_test_single(ex, render_args=render_args))
+        out_prompt.extend(gpt4_o_image_test_single(
+            ex, render_args=render_args))
         out_prompt.append(
             {
                 "role": "assistant",
@@ -1754,7 +1782,8 @@ async def fix_on_input(
 
     this_prompt = list(
         make_all_fix_prompt_alt(
-            example_all_reasoning_and_outputs + [(name, all_reasoning_and_outputs)],
+            example_all_reasoning_and_outputs +
+            [(name, all_reasoning_and_outputs)],
             args=args,
             use_next_prompt=True,
             use_explicit_start=use_explicit_start,
@@ -1784,7 +1813,8 @@ async def fix_on_input(
             max_n_per_round = new_max_n
 
     if orig_max_n_per_round != max_n_per_round:
-        print(f"Reducing {orig_max_n_per_round=} to {max_n_per_round=} ({n_toks=})")
+        print(
+            f"Reducing {orig_max_n_per_round=} to {max_n_per_round=} ({n_toks=})")
 
     try:
         out = await call(this_prompt, t=t, n=n, max_n_per_call=max_n_per_round)

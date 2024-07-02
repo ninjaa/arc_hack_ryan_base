@@ -1,42 +1,51 @@
 # %%
-# import os
+import pdb
+import os
+import sys
 
-# # %%
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# os.environ["REDIS_READER_PORT"] = "6381"
-# os.environ["INPUT_JSON"] = "./arc-agi_evaluation_challenges.json"
-# os.environ["INPUT_TRAIN_JSON"] = "./arc-agi_training_challenges.json"
-# os.environ["INPUT_JSON_SOLUTIONS"] = (
-#     "./arc-agi_evaluation_solutions.json"  # NOTE: it is allowed for this to be unset or invalid
-# )
-# os.environ["RUN_FULL_SAMPLES"] = "0"
+os.environ["REDIS_READER_PORT"] = "6379"
+os.environ["INPUT_JSON"] = "./arc-prize-2024/arc-agi_evaluation_challenges.json"
+# os.environ["INPUT_JSON"] = "./arc-prize-2024/mini-test.json"
+os.environ["INPUT_TRAIN_JSON"] = "./arc-prize-2024/arc-agi_training_challenges.json"
+os.environ["INPUT_JSON_SOLUTIONS"] = (
+    # NOTE: it is allowed for this to be unset or invalid
+    "./arc-prize-2024/arc-agi_evaluation_solutions.json"
+)
+os.environ["RUN_FULL_SAMPLES"] = "0"
 
-# os.environ["RUN_ON_SUBSET"] = "100"  # optional integer
+os.environ["RUN_ON_SUBSET"] = "30"  # optional integer
 
 # # os.environ["BAN_UNCACHED_LLM_QUERIES"] = "1"
 
-# %%
-
-# %%
-
-import math
-from collections import defaultdict
-import contextlib
-import os
-import json
-import random
-from typing import Any, Callable, Optional, TypeVar
-import itertools
-import asyncio
-
-
-from tqdm.asyncio import tqdm_asyncio
-import nest_asyncio
-import numpy as np
-from cattrs.preconf.json import make_converter
-
-json_converter = make_converter()
-
+import matplotlib.pyplot as plt
+import tiktoken
+from arc_solve.reasoning_and_labels import (
+    code_repair_reasoning_examples_change_alt_color_new_long_use_diff,
+    code_repair_spreadsheet_alt_color_reasoning_examples_swap,
+    basic_change_alt_color_variants,
+    reasoning_labeled_items_full_spreadsheet_alt_color_concise_diff_variants,
+    example_20_full_spreadsheet_reasoning_with_diff,
+    example_20_full_spreadsheet_reasoning_with_diff_use_connected_diagonal,
+    example_20_full_spreadsheet,
+)
+from arc_solve.load_data import (
+    get_subset_to_run,
+    out_data_by_name_d,
+)
+from arc_solve.edit_distance import is_valid, select_best_k_items_in_terms_of_distance
+from arc_solve.run_programs import (
+    KeyNameS,
+    RunItem,
+    RunOutput,
+    evaluate_funcs_with_timeout_cache,
+)
+from arc_solve.render import RenderArgs, grid_to_base64_png_oai_content, show_grid
+from arc_solve.submission import (
+    make_submission_dict,
+    score_submission_dict,
+)
 from arc_solve.prompting import (
     DisplayArgs,
     PromptArgs,
@@ -50,31 +59,30 @@ from arc_solve.prompting import (
     process_prompt_args_for_name,
     run_on_input_with_name_alt,
 )
-from arc_solve.submission import (
-    make_submission_dict,
-    score_submission_dict,
-)
-from arc_solve.render import RenderArgs, grid_to_base64_png_oai_content, show_grid
-from arc_solve.run_programs import (
-    KeyNameS,
-    RunItem,
-    RunOutput,
-    evaluate_funcs_with_timeout_cache,
-)
-from arc_solve.edit_distance import is_valid, select_best_k_items_in_terms_of_distance
-from arc_solve.load_data import (
-    get_subset_to_run,
-    out_data_by_name_d,
-)
-from arc_solve.reasoning_and_labels import (
-    code_repair_reasoning_examples_change_alt_color_new_long_use_diff,
-    code_repair_spreadsheet_alt_color_reasoning_examples_swap,
-    basic_change_alt_color_variants,
-    reasoning_labeled_items_full_spreadsheet_alt_color_concise_diff_variants,
-    example_20_full_spreadsheet_reasoning_with_diff,
-    example_20_full_spreadsheet_reasoning_with_diff_use_connected_diagonal,
-    example_20_full_spreadsheet,
-)
+from cattrs.preconf.json import make_converter
+import numpy as np
+import nest_asyncio
+from tqdm.asyncio import tqdm_asyncio
+import asyncio
+import itertools
+from typing import Any, Callable, Optional, TypeVar
+import random
+import json
+import contextlib
+from collections import defaultdict
+import math
+from pprint import pprint
+
+# # %%
+
+
+
+# %%
+
+# %%
+
+
+json_converter = make_converter()
 
 nest_asyncio.apply()
 
@@ -101,14 +109,15 @@ eval_out_here = asyncio.run(
 # len(eval_out_here)
 for item in eval_out_here:
     assert item.run_output is not None
-    assert item.run_output.all_train_correct(), f"fail at {item.key_name_s.name}"
-
+    assert item.run_output.all_train_correct(
+    ), f"fail at {item.key_name_s.name}"
 
 # %%
 
 code_repair_spreadsheet_alt_color_reasoning_examples_use = (
     # code_repair_spreadsheet_alt_color_reasoning_examples
-    code_repair_spreadsheet_alt_color_reasoning_examples_swap  # IDK if we should actually use this...
+    # IDK if we should actually use this...
+    code_repair_spreadsheet_alt_color_reasoning_examples_swap
     # code_repair_spreadsheet_alt_color_reasoning_examples_alt_shorter
 )
 
@@ -201,7 +210,8 @@ code_repair_reasoning_examples_w_outputs_change_alt_color = [
     (
         name,
         [
-            (s, code_reasoning_examples_change_alt_color_name_to_idx[name][idx])
+            (s,
+             code_reasoning_examples_change_alt_color_name_to_idx[name][idx])
             for idx, s in enumerate(reasoning)
         ],
     )
@@ -211,6 +221,22 @@ code_repair_reasoning_examples_w_outputs_change_alt_color = [
 # %%
 
 names_alt = get_subset_to_run()
+
+dimensions = {}
+
+if "INPUT_JSON_SOLUTIONS" in os.environ and os.path.exists(
+    os.environ["INPUT_JSON_SOLUTIONS"]
+):
+    expected_sub_file = os.environ["INPUT_JSON_SOLUTIONS"]
+
+    with open(expected_sub_file, "r") as file:
+        expected_sub = json.load(file)
+
+    for k in names_alt:
+        expected_sub_alt = expected_sub[k]
+        columns = len(expected_sub_alt[0])
+        rows = len(expected_sub_alt[0][0]) if columns > 0 else 0
+        dimensions[k] = {'rows': rows, 'columns': columns}
 
 # %%
 
@@ -339,14 +365,14 @@ def make_prompt_args(variant_idx: int) -> PromptArgs:
     )
 
 
-prompt_settings_all = [make_prompt_args(variant_idx) for variant_idx in range(8)]
+prompt_settings_all = [make_prompt_args(
+    variant_idx) for variant_idx in range(8)]
 
 name_to_prompt_settings = {x.name: x for x in prompt_settings_all}
 
 assert os.environ["RUN_FULL_SAMPLES"] in {"0", "1"}, "invalid RUN_FULL_SAMPLES"
 
 is_small_run = os.environ["RUN_FULL_SAMPLES"] == "0"
-
 
 total_n = (32 * 6) if is_small_run else (96 * 8)
 n_per = 32 if is_small_run else 96
@@ -357,7 +383,7 @@ async def run_all_alt():
     assert n_per_by_key is None
     assert (total_n % n_per) == 0
     count = total_n // n_per
-    print(f"{count=}")
+    print(f"count={count}")
 
     settings_here = prompt_settings_all[:count]
 
@@ -391,6 +417,7 @@ async def run_all_alt():
                     #     else None
                     # ),
                     dry_run=False,
+                    dimensions=dimensions
                 )
                 for prompt_args in settings_here
                 for name in names_alt
@@ -473,7 +500,8 @@ def process_eval_out_w_reasoning_and_outputs(
     eval_out_dict = {
         k: {
             name: [
-                by_key_w_reasoning_and_outputs[k][name][s_idx][0] + [(s, output)]
+                by_key_w_reasoning_and_outputs[k][name][s_idx][0] +
+                [(s, output)]
                 for s, s_idx, output in s_vals
             ]
             for name, s_vals in vs.items()
@@ -549,7 +577,8 @@ def map_item_eval(
     x: Callable[[RunOutput], T],
 ) -> dict[str, dict[str, list[T]]]:
     return {
-        k: {name: [x(output) for output, _ in s_vals] for name, s_vals in vs.items()}
+        k: {name: [x(output) for output, _ in s_vals]
+            for name, s_vals in vs.items()}
         for k, vs in eval_out_dict.items()
     }
 
@@ -559,7 +588,8 @@ def map_all_items_eval(
     x: Callable[[list[RunOutput]], T],
 ) -> dict[str, dict[str, T]]:
     return {
-        k: {name: x([output for output, _ in s_vals]) for name, s_vals in vs.items()}
+        k: {name: x([output for output, _ in s_vals])
+            for name, s_vals in vs.items()}
         for k, vs in eval_out_dict.items()
     }
 
@@ -635,7 +665,8 @@ def get_fix_prompt_args_examples_for_key_name(key: str, name: str):
     kwargs = dict(
         use_output_diff=True,
         use_if_fix_fail_line=False,
-        use_typical_issue_text=not prompt_settings.system_use_multi_part_transformation_rule_hint, # If less focused on rule, emphasize rule details more now.
+        # If less focused on rule, emphasize rule details more now.
+        use_typical_issue_text=not prompt_settings.system_use_multi_part_transformation_rule_hint,
     )
 
     if is_eq_size_item(name):
@@ -761,7 +792,8 @@ async def run_all_fix_items():
         # for key in eval_out_dict.keys():
         all_run_items_w_keys = sum(
             (
-                [(ro, s, key) for ro, s in v[name] if can_include_for_fix(ro, name)]
+                [(ro, s, key)
+                 for ro, s in v[name] if can_include_for_fix(ro, name)]
                 for key, v in eval_out_dict_main.items()
             ),
             [],
@@ -822,7 +854,8 @@ async def run_all_fix_items():
             )
 
     ret: list[
-        tuple[str, list[tuple[str, RunOutput]], PromptArgs, Optional[list[str]]]
+        tuple[str, list[tuple[str, RunOutput]],
+              PromptArgs, Optional[list[str]]]
     ] = await tqdm_asyncio.gather(
         *(
             fix_on_input(
@@ -839,7 +872,8 @@ async def run_all_fix_items():
                     (45_000, 8),
                 ],
                 args=prompt_args,
-                use_explicit_start=False,  # TODO: test more carefully later, but probably doesn't matter...
+                # TODO: test more carefully later, but probably doesn't matter...
+                use_explicit_start=False,
                 # do_print_prompt=True,
                 use_fix_reasoning_tags=True,
                 **fix_kwargs,
@@ -868,7 +902,8 @@ async def run_all_fix_items():
 
 # %%
 
-fix_items_out, fix_items_with_w_reasoning_and_outputs = asyncio.run(run_all_fix_items())
+fix_items_out, fix_items_with_w_reasoning_and_outputs = asyncio.run(
+    run_all_fix_items())
 
 # %%
 
@@ -898,7 +933,8 @@ ALLOWED_ATTEMPTS = 2
 
 # %%
 
-all_fully_merged_eval: dict[str, list[tuple[RunOutput, str]]] = defaultdict(list)
+all_fully_merged_eval: dict[str,
+                            list[tuple[RunOutput, str]]] = defaultdict(list)
 
 for k, vs in eval_out_dict_main.items():
     # if k != "variant_0":
@@ -918,7 +954,6 @@ submission_dict = make_submission_dict(
 
 # %%
 
-import tiktoken
 
 tokenizer = tiktoken.encoding_for_model("gpt-4o")
 
@@ -958,7 +993,8 @@ if "INPUT_JSON_SOLUTIONS" in os.environ and os.path.exists(
         loaded_sub, expected_sub, allowed_attempts=ALLOWED_ATTEMPTS
     )
 
-    print(f"{overall_score=}")
+    print(f"overall_score={overall_score}")
+    import pdb; pdb.set_trace()
 else:
     expected_sub = None
 
@@ -975,7 +1011,7 @@ def score_this(merged_eval):
         submission_dict, expected_sub, allowed_attempts=ALLOWED_ATTEMPTS
     )
 
-    print(f"{overall_score=}")
+    print(f"overall_score={overall_score}")
 
     return overall_score
 
@@ -1021,7 +1057,8 @@ def run_for_k(k: int, max_chunks: int = 16):
         if k > len(x) // 2:
             out_chunks = [x[:k]]
         else:
-            out_chunks = [x[i : i + k] for i in list(range(0, len(x), k))[:max_chunks]]
+            out_chunks = [x[i: i + k]
+                          for i in list(range(0, len(x), k))[:max_chunks]]
 
         for chunk in out_chunks:
             assert len(chunk) == k
@@ -1054,14 +1091,14 @@ def run_for_k(k: int, max_chunks: int = 16):
 fit_start = 4
 
 if expected_sub is not None:
-    perfs_by_k = [run_for_k(k, max_chunks=max(min(256, total_n) // k, 1)) for k in ks]
+    perfs_by_k = [run_for_k(k, max_chunks=max(
+        min(256, total_n) // k, 1)) for k in ks]
     # log_incor_by_k = np.log2(1 - np.array(perfs_by_k))
     lin_fit = np.polyfit(np.log2(ks[fit_start:]), perfs_by_k[fit_start:], 1)
     # log_incor_fit = np.polyfit(np.log2(ks)[fit_start:], log_incor_by_k[fit_start:], 1)
 
 # %%
 
-import matplotlib.pyplot as plt
 
 # %%
 

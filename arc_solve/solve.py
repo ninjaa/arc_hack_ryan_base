@@ -5,8 +5,12 @@ import contextlib
 from typing import Any, Callable, Optional, TypeVar
 import asyncio
 
-os.environ["REDIS_READER_PORT"] = "6381"
+os.environ["REDIS_READER_PORT"] = "6379"
 # os.environ["BAN_UNCACHED_LLM_QUERIES"] = "1"
+import sys
+
+# Add the parent directory to the sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from tqdm.asyncio import tqdm_asyncio
 import attrs
