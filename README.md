@@ -7,12 +7,12 @@
 [Presentation](https://docs.google.com/presentation/d/1TSviK0q04J6OOje3KKVQHnA0xuPeSKWs7TfWzkFDKc8/edit)
 [Notes](https://docs.google.com/document/d/16cyM-GyRWkhQ7KGeLOaCaGW4t9OtOqRF1IXrzi8AGFA/edit)
 
-### Changes
+### Steps, Experiments & Results
 
 - Recreated Ryan's environment locally
 - Studied how it works, see [notes](https://docs.google.com/document/d/16cyM-GyRWkhQ7KGeLOaCaGW4t9OtOqRF1IXrzi8AGFA/edit)
 - Attempted dimensions hint injection, results in [presentation](https://docs.google.com/presentation/d/1TSviK0q04J6OOje3KKVQHnA0xuPeSKWs7TfWzkFDKc8/edit)
-- Attempted GPT-4 substitution
+- Attempted GPT-4 substitution, it did not work
 - Created arckit-analysis and saved results in [results.json](./arckit-analysis/results.json)
 - Did not have time to inject arckit-analysis results to test if they improved performance
 - Shaw also created GPTCoder the next day https://github.com/lalalune/gptcoder & is trying that now
